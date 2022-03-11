@@ -21,8 +21,9 @@ class Data_Pre():
         self.symol = [",", ".", "?", "\"", "”", "。", "？", "","，",",","、","”"]
         self.word2id = encoder_vocab.word2id
         self.word2id4dec = decoder_vocab.word2id
-        self.charge2detail = json.load(open('charge_details.json','r'))
-        self.charge2id = json.load(open('charge2id.json','r'))
+        data_name="laic_data"
+        self.charge2detail = json.load(open('data/{}/charge_details.json'.format(data_name),'r'))
+        self.charge2id = json.load(open('data/{}/charge2id.json'.format(data_name),'r'))
 
     def transform(self, word,type='encoder'):
         if type=='encoder':
@@ -48,7 +49,6 @@ class Data_Pre():
         return result
     
     def seq2tensor(self, sents, types ,max_len):
-        
         sent_len_max = max([len(s) for s in sents])
         sent_len_max = min(sent_len_max, max_len)
         EOS_token = 1  
@@ -69,14 +69,13 @@ class Data_Pre():
         source = []
         target = []
         charge_label = []
-        for index,line in enumerate(data):
+        for index, line in enumerate(data):
             line = json.loads(line)
-            
             charge = line['charge']
-            
             charge_label.append(int(self.charge2id[charge]))
             source.append(self.parse(line['fact']))
-            target.append(self.parse(re_view(line['adc'])))
+            # target.append(self.parse(re_view(line['rat_1'])))
+            target.append(self.parse(line['rat_2']))
 
         charge_label = torch.tensor(charge_label,dtype=torch.long)
         source,source_len = self.seq2tensor(source, types = 'encoder', max_len=500)

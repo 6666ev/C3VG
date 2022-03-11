@@ -15,6 +15,15 @@ from model import Seq2seqAttn
 from utils import Data_Pre
 import os
 import re
+
+testset_path = "data/laic_data/test.json"
+# testset_path = "data/c3vg_dataset/generation_test.json"
+model_name = 'logs/laic/rat_1/_model0_15'
+res_data = "laic_rat_1_res.txt"
+batch_size = 1
+encoder_vocab_path = 'pkl/laic/encoder_vocab.pickle'
+decoder_vocab_path = 'pkl/laic/rat_1_vocab.pickle'
+
 def relaw(rel, text):
     p = re.compile(rel)
     m = p.search(text)
@@ -176,10 +185,10 @@ data_all = []
 os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-with open('encoder_vocab.pickle', 'rb') as file:
+with open(encoder_vocab_path, 'rb') as file:
     encoder_vocab=pickle.load(file)
     
-with open('decoder_vocab.pickle', 'rb') as file:
+with open(decoder_vocab_path, 'rb') as file:
     decoder_vocab=pickle.load(file)
         
 src_vocab = len(encoder_vocab.word2id)
@@ -188,18 +197,15 @@ process = Data_Pre(encoder_vocab,decoder_vocab)
 model = Seq2seqAttn(src_vocab, tgt_vocab, device ,process)
 model = model.to(device)
 
-model_name = '_model0_15'
 PATH = model_name
 model.load_state_dict(torch.load(PATH))
 model.to(device)
 
-f = open('test.json')
+f = open(testset_path)
 for index,line in enumerate(f):
-
     lines = json.loads(line)
-      
-    if re_view(lines['adc']) == -1:
-        continue
+    # if re_view(lines['adc']) == -1:
+    #     continue
     charge = lines['charge']
     if charge=='其他刑事犯':
         continue
@@ -207,14 +213,13 @@ for index,line in enumerate(f):
 
 random.shuffle(data_all)
 test_data = data_all
-print(test_data)
-dataloader = DataLoader(test_data, batch_size=128, shuffle=False, num_workers=0, drop_last=False)
+# print(test_data)
+dataloader = DataLoader(test_data, batch_size=batch_size, shuffle=False, num_workers=0, drop_last=False)
 
 result_seq = []
 predictions_charge = []
 true_charge = []
 for step,batch in enumerate(tqdm(dataloader)):
-
     model.eval()
     source,target,charge_label = process.process(batch)
     true_charge.extend(charge_label.numpy())
@@ -231,5 +236,7 @@ for step,batch in enumerate(tqdm(dataloader)):
             result_sentence+=i
             result_sentence+=' '
         result_seq.append(result_sentence)
-print(result_seq)
+with open(res_data,"w") as f:
+    for line in result_seq:
+        f.write(line+"\n")
 eval_data_types(true_charge,predictions_charge,num_labels=62)

@@ -138,6 +138,9 @@ class DecRNN(nn.Module):
     def forward(self, inputs, hidden, enc_outs):
       
         embs = self.dropout(self.embed(inputs))
+        # embs [1, 1, 200]
+        # hidden [16, 150]
+        # Expected hidden size (1, 1, 150), got [16, 150]
         dec_out, hidden = self.rnn(embs, hidden)
         
         attn_weights = self.attn(dec_out, enc_outs)
@@ -170,7 +173,7 @@ class Mask_Attention(nn.Module):
         return context_vec
 
 class Seq2seqAttn(nn.Module):
-    def __init__(self, src_vocab, tgt_vocab, device,process):
+    def __init__(self, src_vocab, tgt_vocab, device, process):
         super().__init__()        
         self.src_vsz = src_vocab
         self.tgt_vsz = tgt_vocab
@@ -180,7 +183,8 @@ class Seq2seqAttn(nn.Module):
         self.dropout = 0.1
         self.n_layers = 1
         self.attn = 'concat'
-        self.id2charge = json.load(open('id2charge.json','r'))
+        data_name = "laic_data"
+        self.id2charge = json.load(open('data/{}/id2charge.json'.format(data_name),'r'))
         self.encoder = EncRNN(self.src_vsz, self.embed_dim, self.hidden_dim, 
                               self.n_layers, self.bidirectional, self.dropout)
         self.decoder = DecRNN(self.tgt_vsz, self.embed_dim, self.hidden_dim, 
@@ -189,7 +193,7 @@ class Seq2seqAttn(nn.Module):
         self.device = device
         self.process = process
         self.use_birnn = self.bidirectional
-        self.charge_class = 62
+        self.charge_class = len(self.id2charge.keys())
         self.charge_pred = nn.Linear(self.hidden_dim,self.charge_class)
         self.mask_attention = Mask_Attention()
 
@@ -246,12 +250,15 @@ class Seq2seqAttn(nn.Module):
             if beam_size==1:
                 terminal_sentences, prev_top_sentences, next_top_sentences = [], [], []
                 decoder_hidden = hidden
-                with open('decoder_vocab.pickle', 'rb') as file:
+                decoder_vocab_path = 'pkl/laic/rat_1_vocab.pickle'
+                with open(decoder_vocab_path, 'rb') as file:
                     decoder_vocab=pickle.load(file)
                 prev_top_sentences.append(Sentence(decoder_hidden,decoder_vocab))
                 for i in range(maxlen):
                     for sentence in prev_top_sentences:
-                        decoder_input = torch.LongTensor([[sentence.last_idx]])
+                        # decoder_input = torch.LongTensor([[sentence.last_idx]])
+                        batch_size = enc_outs.shape[0]
+                        decoder_input = torch.LongTensor([[sentence.last_idx]] * batch_size)
                         decoder_input = decoder_input.to(self.device)
                         #print(decoder_input.size())
                         decoder_hidden = sentence.decoder_hidden
